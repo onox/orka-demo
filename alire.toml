@@ -1,0 +1,14 @@
+name = "orka_demo"
+description = "Demo using Orka 3D engine"
+version = "0.2.0"
+
+authors = ["onox"]
+maintainers = ["onox <denkpadje@gmail.com>"]
+maintainers-logins = ["onox"]
+
+executables = ["orka_demo"]
+
+[[depends-on]]
+orka_glfw = "^1.0.0"
+orka_plugin_atmosphere = "^1.0.0"
+orka_plugin_terrain = "^1.0.0"
