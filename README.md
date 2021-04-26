@@ -81,7 +81,7 @@ Hold right mouse button to rotate the camera.
 If you have a gamepad, you can use the following buttons and axes:
 
 | Button/axis                            | Function                               |
-+----------------------------------------+----------------------------------------+
+|----------------------------------------|----------------------------------------|
 | Cross/A                                | View sphere/planet/satellite           |
 | Circle/B                               | Toggle blur post-processing            |
 | Square/X                               | Freeze updating wireframe              |
