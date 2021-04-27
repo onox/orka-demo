@@ -779,16 +779,16 @@ begin
                         Image_D (Orka.Float_64 (Terrain_Parameters.Min_LoD_Standard_Dev)) & " "
                     & (if Use_Smap then "smap" else "no smap") & " "
 
-                    & "Atmos: " & Trim (Image (To_Time_Span (GPU_Timers (1)))) & " "
-                    & "Terrain: " & Trim (Image (To_Time_Span (GPU_Timers (2)))) & " ["
+                    & "Atmos: " & Trim (Image (GPU_Timers (1))) & " "
+                    & "Terrain: " & Trim (Image (GPU_Timers (2))) & " ["
 
                     & "upd(" & Trim (Visible_Tiles'Image) & "): " &
-                        Trim (Image (To_Time_Span (Terrain_Timers (1)))) & " "
-                    & "rnd: " & Trim (Image (To_Time_Span (Terrain_Timers (2)))) & "] "
+                        Trim (Image (Terrain_Timers (1))) & " "
+                    & "rnd: " & Trim (Image (Terrain_Timers (2))) & "] "
 
-                    & "Frame: " & Trim (Image (To_Time_Span (GPU_Timers (3)))) & " "
+                    & "Frame: " & Trim (Image (GPU_Timers (3))) & " "
                     & "Res(" & Do_Blur'Image & "): " &
-                      Trim (Image (To_Time_Span (GPU_Timers (4)))) & " "
+                      Trim (Image (GPU_Timers (4))) & " "
 
 --                    & " expo:" & Exposure'Image
 
