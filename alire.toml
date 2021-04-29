@@ -9,6 +9,5 @@ maintainers-logins = ["onox"]
 executables = ["orka_demo"]
 
 [[depends-on]]
-orka_glfw = "^1.0.0"
 orka_plugin_atmosphere = "^1.0.0"
 orka_plugin_terrain = "^1.0.0"

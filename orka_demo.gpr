@@ -1,4 +1,3 @@
-with "orka_glfw";
 with "orka_plugin_atmosphere";
 with "orka_plugin_terrain";
 
