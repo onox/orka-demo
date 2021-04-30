@@ -1,5 +1,7 @@
 with "orka_plugin_atmosphere";
 with "orka_plugin_terrain";
+with "awt-linux";
+with "awt";
 
 project Orka_Demo is
 
@@ -28,8 +30,8 @@ project Orka_Demo is
            ("-gnatwa",  -- All warnings
             "-gnatVa",  -- All validity checks
             "-gnatf",   -- Full errors
-            "-gnatwFl.l.s",
-            "-gnatwe"); -- Warnings as errors
+            "-gnatwFl.l.s");
+--            "-gnatwe"); -- Warnings as errors
       when others => null;
    end case;
 

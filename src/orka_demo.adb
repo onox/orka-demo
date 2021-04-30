@@ -12,13 +12,12 @@ with GL.Types;
 
 with Orka.Behaviors;
 with Orka.Cameras.Rotate_Around_Cameras;
-with Orka.Contexts;
+with Orka.Contexts.AWT;
 with Orka.Debug;
 with Orka.Features.Atmosphere.Earth;
 with Orka.Features.Terrain.Spheres;
 with Orka.Inputs.Joysticks.Filtering;
 with Orka.Inputs.Joysticks.Gamepads;
-with Orka.Inputs.GLFW;
 with Orka.Inputs.Pointers;
 with Orka.Loggers.Terminal;
 with Orka.Logging;
@@ -35,7 +34,6 @@ with Orka.Rendering.Programs.Modules;
 with Orka.Rendering.Programs.Uniforms;
 with Orka.Rendering.Textures;
 with Orka.Resources.Locations.Directories;
-with Orka.Windows.GLFW;
 with Orka.Timers;
 with Orka.Transforms.Doubles.Quaternions;
 with Orka.Transforms.Singles.Matrices;
@@ -45,8 +43,8 @@ with Orka.Transforms.Doubles.Matrix_Conversions;
 with Orka.Transforms.Doubles.Vectors;
 with Orka.Transforms.Doubles.Vector_Conversions;
 with Orka.Types;
-
-with Glfw.Input.Joysticks;
+with Orka.Windows;
+with AWT.Inputs;
 
 with Atmosphere_Types.Objects;
 with Coordinates;
@@ -169,10 +167,12 @@ procedure Orka_Demo is
 
    T1 : constant Time := Clock;
 
-   Context : constant Orka.Contexts.Context'Class := Orka.Windows.GLFW.Create_Context
-     (Version => (4, 2), Flags => (Debug => True, others => False));
+   Context : constant Orka.Contexts.Surface_Context'Class :=
+     Orka.Contexts.AWT.Create_Context
+       (Version => (4, 2),
+        Flags   => (Debug => True, others => False));
 
-   Window : aliased Orka.Windows.Window'Class := Orka.Windows.GLFW.Create_Window
+   Window : aliased Orka.Windows.Window'Class := Demo.Create_Window
      (Context, Window_Width, Window_Height, Resizable => False);
 
    use Orka.Resources;
@@ -197,14 +197,16 @@ procedure Orka_Demo is
 
    JS : Orka.Inputs.Joysticks.Joystick_Input_Access;
 
-   JS_Manager : constant Orka.Inputs.Joysticks.Joystick_Manager_Ptr :=
-     Orka.Inputs.GLFW.Create_Joystick_Manager;
+   --  FIXME
+--   JS_Manager : constant Orka.Inputs.Joysticks.Joystick_Manager_Ptr :=
+--     Orka.Inputs.GLFW.Create_Joystick_Manager;
 
    use type GL.Types.Single;
    use type Orka.Inputs.Joysticks.Joystick_Input_Access;
 begin
    Orka.Logging.Set_Logger (Orka.Loggers.Terminal.Create_Logger (Level => Orka.Loggers.Debug));
    Orka.Debug.Set_Log_Messages (Enable => True, Raise_API_Error => True);
+   Ada.Text_IO.Put_Line ("Context version: " & Orka.Contexts.Image (Context.Version));
 
    Context.Enable (Orka.Contexts.Reversed_Z);
    pragma Assert (Samples > 0);
@@ -215,10 +217,12 @@ begin
         := Convert (Orka.Resources.Byte_Array'(Location_Data.Read_Data
              ("gamecontrollerdb.txt").Get));
    begin
-      Glfw.Input.Joysticks.Update_Gamepad_Mappings (Mappings);
+      --  FIXME
+      null;
+--      Glfw.Input.Joysticks.Update_Gamepad_Mappings (Mappings);
    end;
 
-   JS_Manager.Acquire (JS);
+--   JS_Manager.Acquire (JS);
 
    if JS /= null then
       Ada.Text_IO.Put_Line ("Joystick:");
@@ -312,7 +316,7 @@ begin
          FB_3 : Framebuffer := Create_Framebuffer (Width, Height, 0, Context);
          FB_4 : Framebuffer := Create_Framebuffer (Width / 2, Height / 2, 0, Context);
 
-         FB_D : constant Framebuffer := Create_Default_Framebuffer (Window_Width, Window_Height);
+         FB_D : Framebuffer (Default => True);
 
          Blur_Filter_GK : array (Blur_Kernel) of Separable_Filter :=
            (Small => Create_Filter
@@ -508,7 +512,21 @@ begin
 
                New_Time : constant Time     := Clock;
                DT       : constant Duration := To_Duration (New_Time - Current_Time);
+
+               Alpha : constant Orka.Float_32 := (if Window.State.Transparent then 0.5 else 1.0);
+               use all type Orka.Logging.Severity;
             begin
+               if Window.Resize then
+                  Window.Resize := False;
+
+                  FB_D := Orka.Rendering.Framebuffers.Get_Default_Framebuffer (Window);
+                  FB_D.Set_Default_Values ((Color => (0.0, 0.0, 0.0, Alpha), others => <>));
+                  Demo.Messages.Log (Debug, "FB default window, new size: " &
+                    Window.Width'Image & Window.Height'Image);
+               end if;
+
+               FB_D.Clear ((Color => True, others => False));
+
                Timer_0.Start;
                Coordinates.Orientation_ECEF := Earth_Rotation;
 
@@ -564,7 +582,8 @@ begin
                      use all type Orka.Inputs.Joysticks.Button_State;
                      use GP;
 
-                     subtype Gamepad_Button_Index is Glfw.Input.Joysticks.Gamepad_Button_Index;
+                     --  FIXME
+                     subtype Gamepad_Button_Index is Positive range 1 .. 15;
 
                      function Value (Value : Gamepad_Button_Index) return GP.Button is
                        (GP.Button'Val (Value - Gamepad_Button_Index'First));
@@ -1111,7 +1130,56 @@ begin
             Loops.Scene.Add (Object_03);
 
             Loops.Handler.Enable_Limit (False);
-            Loops.Run_Loop (Render_Scene'Access, Loops.Stop_Loop'Access);
+
+            declare
+               task Render_Task is
+                  entry Start_Rendering;
+               end Render_Task;
+
+               task body Render_Task is
+               begin
+                  accept Start_Rendering;
+
+                  Context.Make_Current (Window);
+                  Loops.Run_Loop (Render_Scene'Access, Loops.Stop_Loop'Access);
+                  Context.Make_Not_Current;
+               exception
+                  when Error : others =>
+                     Ada.Text_IO.Put_Line ("Error: " &
+                       Ada.Exceptions.Exception_Information (Error));
+                     Context.Make_Not_Current;
+                     raise;
+               end Render_Task;
+
+               Next_Cursor : AWT.Inputs.Cursors.Pointer_Cursor :=
+                 AWT.Inputs.Cursors.Pointer_Cursor'First;
+            begin
+               Context.Make_Not_Current;
+               Render_Task.Start_Rendering;
+
+               while not Window.Should_Close and then AWT.Process_Events (0.016667) loop
+                  declare
+                     Keyboard : constant AWT.Inputs.Keyboard_State := Window.State;
+
+                     use all type AWT.Inputs.Keyboard_Button;
+                     use type AWT.Inputs.Cursors.Pointer_Cursor;
+                  begin
+                     if Keyboard.Pressed (Key_Escape) then
+                        Window.Close;
+                     end if;
+
+                     if Keyboard.Pressed (Key_C) then
+                        Next_Cursor :=
+                          (if Next_Cursor = AWT.Inputs.Cursors.Pointer_Cursor'Last then
+                             AWT.Inputs.Cursors.Pointer_Cursor'First
+                           else
+                             AWT.Inputs.Cursors.Pointer_Cursor'Succ (Next_Cursor));
+                        Window.Set_Pointer_Cursor (Next_Cursor);
+                     end if;
+                  end;
+               end loop;
+               Ada.Text_IO.Put_Line ("Exited event loop in main task");
+            end;
          end;
       end;
    end;
