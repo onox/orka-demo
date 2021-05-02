@@ -471,6 +471,12 @@ begin
             Line_Points_ECEF : constant Buffer := Create_Buffer
               (Mutable_Buffer_Flags, Orka.Types.Single_Vector_Type, 16);
 
+            package Loops is new Orka.Loops
+              (Time_Step   => Ada.Real_Time.Microseconds (2_083),
+               Frame_Limit => Ada.Real_Time.Microseconds (16_667),
+               Camera      => Current_Camera,
+               Job_Manager => Demo.Job_System);
+
             procedure Render_Scene
               (Scene  : not null Orka.Behaviors.Behavior_Array_Access;
                Camera : Orka.Cameras.Camera_Ptr)
@@ -1109,14 +1115,13 @@ begin
                if Previous_Viewed_Object /= Current_Viewed_Object then
                   Update_Viewed_Object (Camera, Current_Viewed_Object);
                end if;
-            end Render_Scene;
 
-            package Loops is new Orka.Loops
-              (Time_Step   => Ada.Real_Time.Microseconds (2_083),
-               Frame_Limit => Ada.Real_Time.Microseconds (16_667),
-               Window      => Window'Unchecked_Access,
-               Camera      => Current_Camera,
-               Job_Manager => Demo.Job_System);
+               Window.Swap_Buffers;
+
+               if Window.Should_Close then
+                  Loops.Stop_Loop;
+               end if;
+            end Render_Scene;
 
             T2 : constant Time := Clock;
          begin
@@ -1141,7 +1146,7 @@ begin
                   accept Start_Rendering;
 
                   Context.Make_Current (Window);
-                  Loops.Run_Loop (Render_Scene'Access, Loops.Stop_Loop'Access);
+                  Loops.Run_Loop (Render_Scene'Access);
                   Context.Make_Not_Current;
                exception
                   when Error : others =>
