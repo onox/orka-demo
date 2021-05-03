@@ -12,9 +12,10 @@ at 200 km altitude.
 This demo has only been tested on Linux with an Intel GPU with Mesa's i965 and Iris drivers.
 If you have a different OS or GPU, let me know if it works :slightly_smiling_face:
 
-In the future GLFW will be replaced with [AWT][url-awt] for keyboard support
-and [evdev-ada][url-evdev-ada] for force-feedback support. AWT only supports Wayland at
+GLFW has been replaced with [AWT][url-awt] for keyboard support. AWT only supports Wayland at
 the moment, but hopefully someone can help with writing a win32 backend.
+
+In the future, [evdev-ada][url-evdev-ada] will be used for force-feedback support.
 
 ## Github stars
 
@@ -43,15 +44,17 @@ prime meridian (0 longitude) and satellite:
 
  * [Alire][url-alire]
 
- * [GLFW][url-glfw] 3.3
-
  * `make` (optional, useful on Linux)
+
+ * Git repositories mentioned below
 
 ## Getting started
 
 Download [Orka][url-orka] and this repository:
 
 ```sh
+git clone https://github.com/onox/wayland-ada
+git clone https://github.com/onox/awt
 git clone https://github.com/onox/orka
 git clone https://github.com/onox/orka-demo
 cd orka-demo
@@ -167,6 +170,5 @@ and licensed under the Zlib license.
   [url-awt]: https://github.com/onox/awt
   [url-evdev-ada]: https://github.com/onox/evdev-ada
   [url-gamecontrollerdb]: https://github.com/gabomdq/SDL_GameControllerDB
-  [url-glfw]: http://www.glfw.org/
   [url-orka]: https://github.com/onox/orka
   [url-terrain-png]: https://github.com/jdupuy/LongestEdgeBisectionDemos/blob/master/assets/Terrain4k.png
