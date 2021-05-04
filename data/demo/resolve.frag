@@ -1,10 +1,10 @@
 #version 420 core
 
 #extension GL_EXT_shader_samples_identical : require
+#extension GL_ARB_shader_texture_image_samples : require
 
 layout(binding = 0) uniform sampler2DMS colorTexture;
 
-uniform int samples;
 uniform vec4 screenResolution;
 uniform vec3 white_point;
 
@@ -15,6 +15,8 @@ layout(location = 0) out vec4 o_FragColor;
 void main(void)
 {
     const ivec2 P = ivec2(gl_FragCoord.xy * textureSize(colorTexture) / screenResolution.xy);
+
+    const int samples = textureSamples(colorTexture);
 
     // Resolve MSAA samples
     vec4 color = texelFetch(colorTexture, P, 0);

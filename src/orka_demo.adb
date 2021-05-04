@@ -1074,8 +1074,6 @@ begin
                     (GL.Types.Single_Array'((1.0, 1.0, 1.0)));
                end if;
 
-               P_2.Uniform ("samples").Set_Int (Samples);
-
                if Do_Blur /= None then
                   P_2.Uniform ("screenResolution").Set_Vector
                     (Orka.Types.Singles.Vector4'
