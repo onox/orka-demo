@@ -345,7 +345,7 @@ begin
 
          Current_Camera : constant Camera_Ptr
            := new Camera'Class'(Camera'Class
-                (Rotate_Around_Cameras.Create_Camera (Window.Pointer_Input, Lens, FB_1)));
+                (Rotate_Around_Cameras.Create_Camera (Window.Pointer_Input, Lens)));
 
          -----------------------------------------------------------------------
 
@@ -551,8 +551,8 @@ begin
                Camera.Set_Up_Direction (Matrices.Vectors.Normalize
                  (Observing_Camera'Class (Camera.all).Target_Position - Planet.Position));
 
-               Camera.FB.Use_Framebuffer;
-               Camera.FB.Clear ((Color | Depth => True, others => False));
+               FB_1.Use_Framebuffer;
+               FB_1.Clear ((Color | Depth => True, others => False));
 
                if JS /= null and then JS.Is_Present then
                   declare
