@@ -18,18 +18,18 @@ package Integrators.RK4 is
      (Subject     : Physics_Object'Class;
       Position    : Vectors.Vector4;
       Velocity    : Vectors.Vector4;
-      Orientation : Quaternions.Quaternion := Quaternions.Identity_Value) return RK4_Integrator;
+      Orientation : Quaternions.Quaternion := Quaternions.Identity) return RK4_Integrator;
 
 private
 
    type Linear_State is record
-      Position, Momentum, Velocity : Vectors.Vector4 := Vectors.Zero_Point;
+      Position, Momentum, Velocity : Vectors.Vector4 := Vectors.Vector4 (Vectors.Zero_Point);
       Inverse_Mass : GL.Types.Double;
    end record;
 
    type Angular_State is record
-      Orientation : Quaternions.Quaternion := Quaternions.Identity_Value;
-      Angular_Momentum, Angular_Velocity : Vectors.Vector4 := Vectors.Zero_Point;
+      Orientation : Quaternions.Quaternion := Quaternions.Identity;
+      Angular_Momentum, Angular_Velocity : Vectors.Vector4 := Vectors.Vector4 (Vectors.Zero_Point);
       Inverse_Inertia : GL.Types.Double;
    end record;
 

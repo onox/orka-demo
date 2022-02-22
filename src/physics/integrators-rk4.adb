@@ -25,7 +25,7 @@ package body Integrators.RK4 is
    package body Linear_Integrator is
 
       type Derivative is record
-         DX, DP : Vectors.Vector4 := Vectors.Zero_Point;
+         DX, DP : Vectors.Vector4 := Vectors.Vector4 (Vectors.Zero_Point);
       end record;
 
       procedure Update (State : in out Linear_State; Motion : Derivative; DT : Double) is
@@ -81,8 +81,8 @@ package body Integrators.RK4 is
       use Quaternions;
 
       type Derivative is record
-         Spin   : Quaternions.Quaternion := Quaternions.Identity_Value;
-         Torque : Vectors.Vector4 := Vectors.Zero_Point;
+         Spin   : Quaternions.Quaternion := Quaternions.Identity;
+         Torque : Vectors.Vector4 := Vectors.Vector4 (Vectors.Zero_Point);
       end record;
 
       function Quaternion (Value : Vectors.Vector4) return Quaternions.Quaternion is
@@ -156,7 +156,7 @@ package body Integrators.RK4 is
      (Subject     : Physics_Object'Class;
       Position    : Vectors.Vector4;
       Velocity    : Vectors.Vector4;
-      Orientation : Quaternions.Quaternion := Quaternions.Identity_Value) return RK4_Integrator is
+      Orientation : Quaternions.Quaternion := Quaternions.Identity) return RK4_Integrator is
    begin
       return Result : RK4_Integrator do
          Result.Linear.Position := Position;
@@ -172,8 +172,8 @@ package body Integrators.RK4 is
       Subject : in out Physics_Object'Class;
       T, DT   : GL.Types.Double)
    is
-      Total_Force  : Vectors.Vector4 := Vectors.Zero_Direction;
-      Total_Torque : Vectors.Vector4 := Vectors.Zero_Direction;
+      Total_Force  : Vectors.Vector4 := Vectors.Vector4 (Vectors.Zero_Direction);
+      Total_Torque : Vectors.Vector4 := Vectors.Vector4 (Vectors.Zero_Direction);
 
       --  FIXME Just provide 2 vectors instead of 2 functions? (only allow time-invariant systems)
       function Force (State : Linear_State; Time : Double) return Vectors.Vector4 is

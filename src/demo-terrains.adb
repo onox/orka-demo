@@ -10,8 +10,6 @@ with Orka.Transforms.Doubles.Quaternions;
 with Orka.Transforms.Doubles.Vectors;
 with Orka.Transforms.Doubles.Vector_Conversions;
 
-with GL.Types;
-
 package body Demo.Terrains is
 
    Count : constant := 6;
@@ -26,7 +24,7 @@ package body Demo.Terrains is
       use Orka.Rendering.Buffers;
 
       use type Orka.Float_64;
-      use type GL.Types.Single_Array;
+      use type Orka.Float_32_Array;
 
       Planet_Radius : constant Orka.Float_64 :=
         Planet_Data.Semi_Major_Axis / Planet_Model.Length_Unit_In_Meters;
@@ -41,7 +39,7 @@ package body Demo.Terrains is
           (Orka.Float_32 (Planet_Radius),
            Orka.Float_32 (Planet_Data.Flattening), False);
 
-      Terrain_Spheres : constant GL.Types.Single_Array :=
+      Terrain_Spheres : constant Orka.Float_32_Array :=
         Terrain_Sphere_Side &
         Terrain_Sphere_Side &
         Terrain_Sphere_Side &
@@ -179,7 +177,7 @@ package body Demo.Terrains is
       begin
          Program.Uniform ("camera_pos").Set_Vector (CP);
          Program.Uniform ("earth_radius").Set_Single
-           (GL.Types.Single (Object.Planet_Radius));
+           (Orka.Float_32 (Object.Planet_Radius));
 
          Program.Uniform ("sun_direction").Set_Vector
            (Orka.Types.Singles.Vector4'(VC.Convert
@@ -200,7 +198,7 @@ package body Demo.Terrains is
          5 => Rotation * Object.Rotate_90_Up,
          6 => Rotation * Object.Rotate_90_Down);
 
-      Sphere_Visibilities : constant GL.Types.Single_Array :=
+      Sphere_Visibilities : constant Orka.Float_32_Array :=
         Orka.Features.Terrain.Spheres.Get_Sphere_Visibilities
           (Object.Terrain_Spheroid_Parameters,
            Tile_Transforms (1), Tile_Transforms (3), Center, Camera.View_Matrix);

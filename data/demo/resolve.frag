@@ -3,6 +3,8 @@
 #extension GL_EXT_shader_samples_identical : require
 #extension GL_ARB_shader_texture_image_samples : require
 
+layout(origin_upper_left) in vec4 gl_FragCoord;
+
 layout(binding = 0) uniform sampler2DMS colorTexture;
 
 uniform vec4 screenResolution;

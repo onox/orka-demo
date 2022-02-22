@@ -5,24 +5,24 @@ package body Atmosphere_Types is
 
    Hit_Detection : constant Boolean := True;
 
-   use type GL.Types.Double;
+   use type Orka.Float_64;
 
-   procedure Set_Mass (Object : in out Gravity_Object; Value : GL.Types.Double) is
+   procedure Set_Mass (Object : in out Gravity_Object; Value : Orka.Float_64) is
    begin
       Object.Mass := Value;
    end Set_Mass;
 
-   procedure Set_Gravity (Object : in out Gravity_Object; Value : GL.Types.Double) is
+   procedure Set_Gravity (Object : in out Gravity_Object; Value : Orka.Float_64) is
    begin
       Object.Gravity := Value;
    end Set_Gravity;
 
-   procedure Set_Thrust (Object : in out Gravity_Object; Value : GL.Types.Double) is
+   procedure Set_Thrust (Object : in out Gravity_Object; Value : Orka.Float_64) is
    begin
       Object.Thrust := Value;
    end Set_Thrust;
 
-   function Altitude (Object : Gravity_Object) return GL.Types.Double is (Object.Altitude);
+   function Altitude (Object : Gravity_Object) return Orka.Float_64 is (Object.Altitude);
 
    overriding
    procedure Update
@@ -32,7 +32,7 @@ package body Atmosphere_Types is
    is
       use Integrators.Vectors;
 
-      Earth_Center : constant Vector4 := Zero_Point;
+      Earth_Center : constant Vector4 := Vector4 (Zero_Point);
 
       Direction_Down : constant Vector4 :=
         Normalize (Earth_Center - State.Position);
@@ -52,9 +52,9 @@ package body Atmosphere_Types is
       --
       --  z = altitude above sea level
 
-      Distance_To_Center : constant GL.Types.Double :=
+      Distance_To_Center : constant Orka.Float_64 :=
         Integrators.Vectors.Length (State.Position - Earth_Center);
-      Radius_To_Center : constant GL.Types.Double :=
+      Radius_To_Center : constant Orka.Float_64 :=
         Planets.Earth.Planet.Radius (Direction_Up);
         --  FIXME Direction_Up is already flattened
    begin
@@ -63,7 +63,7 @@ package body Atmosphere_Types is
 
       if Hit_Detection and Distance_To_Center <= Radius_To_Center then
          declare
-            Inverse_DT : constant GL.Types.Double := (1.0 / GL.Types.Double (Delta_Time));
+            Inverse_DT : constant Orka.Float_64 := (1.0 / Orka.Float_64 (Delta_Time));
 
             New_Momentum : Vector4 := -State.Momentum;
 --            New_Momentum : Vector4 := -1.0 * State.Velocity * Object.Mass;
@@ -74,7 +74,7 @@ package body Atmosphere_Types is
             --  FIXME Doesn't bounce on the surface of the planet
             --  FIXME Doesn't respect rotational velocity of surface
             Object.F_Anti_Gravity := New_Momentum * Inverse_DT;
-            Object.F_Gravity      := Zero_Direction;
+            Object.F_Gravity      := Vector4 (Zero_Direction);
          end;
 
          --  v1' = (m1 - m2)/(m1 + m2) * v1
@@ -86,7 +86,7 @@ package body Atmosphere_Types is
 
          --  m1v1 = m1v1' + m2v2'
       else
-         Object.F_Anti_Gravity := Zero_Direction;
+         Object.F_Anti_Gravity := Vector4 (Zero_Direction);
          Object.F_Gravity      := Gravity;
       end if;
       Object.Altitude := Distance_To_Center - Radius_To_Center;
@@ -113,11 +113,11 @@ package body Atmosphere_Types is
    end Moments;
 
    overriding
-   function Inverse_Mass (Object : Gravity_Object) return GL.Types.Double is
+   function Inverse_Mass (Object : Gravity_Object) return Orka.Float_64 is
      (1.0 / Object.Mass);
 
    overriding
-   function Inverse_Inertia (Object : Gravity_Object) return GL.Types.Double is
+   function Inverse_Inertia (Object : Gravity_Object) return Orka.Float_64 is
      (8.643415877954968e-05);
 
    overriding
@@ -140,7 +140,7 @@ package body Atmosphere_Types is
         (FDM : in out Integrators.Physics_Object'Class;
          Delta_Time : Duration)
       is
-         DT : constant GL.Types.Double := GL.Types.Double (Delta_Time);
+         DT : constant Orka.Float_64 := Orka.Float_64 (Delta_Time);
       begin
          RK4.Integrate (FDM, T, DT);
          T := T + DT;

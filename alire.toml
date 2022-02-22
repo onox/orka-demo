@@ -12,3 +12,8 @@ executables = ["orka_demo"]
 awt = "^1.0.0"
 orka_plugin_atmosphere = "^1.0.0"
 orka_plugin_terrain = "^1.0.0"
+
+[[pins]]
+awt = { path = "../orka/awt" }
+orka_plugin_atmosphere = { path = "../orka/orka_plugin_atmosphere" }
+orka_plugin_terrain = { path = "../orka/orka_plugin_terrain" }

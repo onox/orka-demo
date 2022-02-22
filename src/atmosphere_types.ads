@@ -17,13 +17,13 @@ package Atmosphere_Types is
 
    type Gravity_Object is new Integrators.Physics_Object with private;
 
-   function Altitude (Object : Gravity_Object) return GL.Types.Double;
+   function Altitude (Object : Gravity_Object) return Orka.Float_64;
 
-   procedure Set_Mass (Object : in out Gravity_Object; Value : GL.Types.Double);
+   procedure Set_Mass (Object : in out Gravity_Object; Value : Orka.Float_64);
 
-   procedure Set_Gravity (Object : in out Gravity_Object; Value : GL.Types.Double);
+   procedure Set_Gravity (Object : in out Gravity_Object; Value : Orka.Float_64);
 
-   procedure Set_Thrust (Object : in out Gravity_Object; Value : GL.Types.Double);
+   procedure Set_Thrust (Object : in out Gravity_Object; Value : Orka.Float_64);
 
    overriding
    procedure Update
@@ -38,10 +38,10 @@ package Atmosphere_Types is
    function Moments (Object : Gravity_Object) return Integrators.Moment_Array_Access;
 
    overriding
-   function Inverse_Mass (Object : Gravity_Object) return GL.Types.Double;
+   function Inverse_Mass (Object : Gravity_Object) return Orka.Float_64;
 
    overriding
-   function Inverse_Inertia (Object : Gravity_Object) return GL.Types.Double;
+   function Inverse_Inertia (Object : Gravity_Object) return Orka.Float_64;
 
    overriding
    function Center_Of_Mass (Object : Gravity_Object) return Integrators.Vectors.Vector4;
@@ -61,7 +61,7 @@ package Atmosphere_Types is
       function State return Integrators.Integrator_State;
    private
       RK4 : Integrators.RK4.RK4_Integrator;
-      T   : GL.Types.Double := 0.0;
+      T   : Orka.Float_64 := 0.0;
    end Integrator;
 
    type Frame_Type is (ECI, ECEF);
@@ -82,14 +82,16 @@ package Atmosphere_Types is
 private
 
    type Gravity_Object is new Integrators.Physics_Object with record
-      F_Gravity      : Integrators.Vectors.Vector4 := Integrators.Vectors.Zero_Direction;
-      F_Anti_Gravity : Integrators.Vectors.Vector4 := Integrators.Vectors.Zero_Direction;
+      F_Gravity      : Integrators.Vectors.Vector4 :=
+        Integrators.Vectors.Vector4 (Integrators.Vectors.Zero_Direction);
+      F_Anti_Gravity : Integrators.Vectors.Vector4 :=
+        Integrators.Vectors.Vector4 (Integrators.Vectors.Zero_Direction);
 
-      Altitude : GL.Types.Double := 0.0;
+      Altitude : Orka.Float_64 := 0.0;
 
-      Mass     : GL.Types.Double := 1.0;
-      Gravity  : GL.Types.Double := 0.0;
-      Thrust   : GL.Types.Double := 0.0;
+      Mass     : Orka.Float_64 := 1.0;
+      Gravity  : Orka.Float_64 := 0.0;
+      Thrust   : Orka.Float_64 := 0.0;
    end record;
 
 end Atmosphere_Types;

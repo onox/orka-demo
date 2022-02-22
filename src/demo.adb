@@ -24,7 +24,7 @@ package body Demo is
 
    overriding
    function Create_Window
-     (Context            : Orka.Contexts.Surface_Context'Class;
+     (Context            : aliased Orka.Contexts.Surface_Context'Class;
       Width, Height      : Positive;
       Title              : String  := "";
       Samples            : Natural := 0;

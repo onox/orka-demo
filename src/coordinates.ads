@@ -25,7 +25,7 @@ package Coordinates is
 
    function Rotate_ECEF return Matrices.Matrix4;
 
-   Orientation_ECEF : Quaternions.Quaternion := Quaternions.Identity_Value;
+   Orientation_ECEF : Quaternions.Quaternion := Quaternions.Identity;
 
 private
 

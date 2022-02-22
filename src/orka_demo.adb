@@ -1,3 +1,5 @@
+with System.Multiprocessors.Dispatching_Domains;
+
 with Ada.Exceptions;
 with Ada.Numerics.Generic_Elementary_Functions;
 with Ada.Real_Time;
@@ -18,7 +20,6 @@ with Orka.Features.Atmosphere.Earth;
 with Orka.Features.Terrain.Spheres;
 with Orka.Inputs.Joysticks.Filtering;
 with Orka.Inputs.Joysticks.Gamepads;
-with Orka.Inputs.Pointers;
 with Orka.Loggers.Terminal;
 with Orka.Logging;
 with Orka.Loops;
@@ -45,6 +46,7 @@ with Orka.Transforms.Doubles.Vector_Conversions;
 with Orka.Types;
 with Orka.Windows;
 with AWT.Inputs;
+with AWT.Windows;
 
 with Atmosphere_Types.Objects;
 with Coordinates;
@@ -111,17 +113,17 @@ procedure Orka_Demo is
 
    Min_AU : constant := 0.005;
 
-   Planet_Rotations     : GL.Types.Double := 0.0;
-   Height_Above_Surface : GL.Types.Double := 0.0;
+   Planet_Rotations     : Orka.Float_64 := 0.0;
+   Height_Above_Surface : Orka.Float_64 := 0.0;
 
    Step_Y : GL.Types.Int := 0;
 
-   Exposure : GL.Types.Single := 10.0;
+   Exposure : Orka.Float_32 := 10.0;
 
    function Clamp (Value : GL.Types.Int) return GL.Types.Int is
      (GL.Types.Int'Max (0, GL.Types.Int'Min (Value, 20)));
 
-   package EF is new Ada.Numerics.Generic_Elementary_Functions (GL.Types.Double);
+   package EF is new Ada.Numerics.Generic_Elementary_Functions (Orka.Float_64);
    package Matrices    renames Orka.Transforms.Doubles.Matrices;
    package Quaternions renames Orka.Transforms.Doubles.Quaternions;
 
@@ -135,8 +137,8 @@ procedure Orka_Demo is
    package Axes    renames Orka.Rendering.Debug.Coordinate_Axes;
    package Spheres renames Orka.Rendering.Debug.Spheres;
 
-   function Image_D (Value : GL.Types.Double) return String is
-      package Double_IO is new Ada.Text_IO.Float_IO (GL.Types.Double);
+   function Image_D (Value : Orka.Float_64) return String is
+      package Double_IO is new Ada.Text_IO.Float_IO (Orka.Float_64);
 
       Value_String : String := "123456789012.12";
    begin
@@ -145,7 +147,7 @@ procedure Orka_Demo is
    end Image_D;
 
    function Get_White_Points
-     (Planet : aliased Orka.Features.Atmosphere.Model_Data) return GL.Types.Single_Array
+     (Planet : aliased Orka.Features.Atmosphere.Model_Data) return Orka.Float_32_Array
    is
       use type Orka.Float_64;
 
@@ -167,16 +169,17 @@ procedure Orka_Demo is
 
    T1 : constant Time := Clock;
 
-   Context : constant Orka.Contexts.Surface_Context'Class :=
+   Context : Orka.Contexts.Surface_Context'Class :=
      Orka.Contexts.AWT.Create_Context
        (Version => (4, 2),
         Flags   => (Debug => True, others => False));
 
-   Window : aliased Orka.Windows.Window'Class := Demo.Create_Window
-     (Context, Window_Width, Window_Height, Resizable => False);
+--   Window : aliased Orka.Windows.Window'Class := Demo.Create_Window
+   Window : aliased Demo.Test_Window :=
+     Demo.Create_Window (Context, Window_Width, Window_Height, Resizable => False);
 
    use Orka.Resources;
-   use type GL.Types.Double;
+   use type Orka.Float_64;
 
    Location_Data : constant Locations.Location_Ptr
      := Locations.Directories.Create_Location ("data");
@@ -201,7 +204,7 @@ procedure Orka_Demo is
 --   JS_Manager : constant Orka.Inputs.Joysticks.Joystick_Manager_Ptr :=
 --     Orka.Inputs.GLFW.Create_Joystick_Manager;
 
-   use type GL.Types.Single;
+   use type Orka.Float_32;
    use type Orka.Inputs.Joysticks.Joystick_Input_Access;
 begin
    Orka.Logging.Set_Logger (Orka.Loggers.Terminal.Create_Logger (Level => Orka.Loggers.Debug));
@@ -292,7 +295,7 @@ begin
       GPU_Timers         : Timer_Array := (others => 0.0);
 
       use GL.Objects.Textures;
-      use type GL.Types.Int;
+      use type Orka.Integer_32;
 
       Texture_1 : Texture (if Samples > 0 then LE.Texture_2D_Multisample else LE.Texture_2D);
       Texture_2 : Texture (if Samples > 0 then LE.Texture_2D_Multisample else LE.Texture_2D);
@@ -339,13 +342,11 @@ begin
               (Location_Orka_Shaders, Texture_4, Radius => 16));
 
          use Orka.Cameras;
-         Lens : constant Lens_Ptr
-           := new Camera_Lens'Class'(Create_Lens
-                (Width, Height, Transforms.FOV (36.0, 50.0), Context));
+         Lens : constant Camera_Lens :=
+           Create_Lens (Width, Height, Transforms.FOV (36.0, 50.0), Context);
 
-         Current_Camera : constant Camera_Ptr
-           := new Camera'Class'(Camera'Class
-                (Rotate_Around_Cameras.Create_Camera (Window.Pointer_Input, Lens)));
+         Current_Camera : aliased Rotate_Around_Cameras.Rotate_Around_Camera :=
+           Rotate_Around_Cameras.Create_Camera (Lens);
 
          -----------------------------------------------------------------------
 
@@ -362,9 +363,12 @@ begin
 
          use Atmosphere_Types.Objects;
 
-         White_Points : constant GL.Types.Single_Array := Get_White_Points (Earth);
+         White_Points : constant Orka.Float_32_Array := Get_White_Points (Earth);
 
-         procedure Update_Viewed_Object (Camera : Camera_Ptr; Kind : View_Object_Kind) is
+         procedure Update_Viewed_Object
+           (Camera : in out Orka.Cameras.Camera'Class;
+            Kind   : View_Object_Kind)
+         is
             Object : constant Orka.Behaviors.Behavior_Ptr :=
               (case Current_Viewed_Object is
                  when Sphere_Kind    => Sphere,
@@ -375,15 +379,15 @@ begin
             --    due to flattening of the Earth (atmosphere assumes sphere is not flattened)
             --  Object_03: position on surface on the edge of two adjacent terrain tiles
          begin
-            if Camera.all in Observing_Camera'Class then
-               Observing_Camera'Class (Camera.all).Look_At (Object);
-            elsif Camera.all in First_Person_Camera'Class then
-               First_Person_Camera'Class (Camera.all).Set_Position (Object.Position);
+            if Camera in Observing_Camera'Class then
+               Observing_Camera'Class (Camera).Look_At (Object);
+            elsif Camera in First_Person_Camera'Class then
+               First_Person_Camera'Class (Camera).Set_Position (Object.Position);
             end if;
 
-            if Camera.all in Rotate_Around_Cameras.Rotate_Around_Camera'Class then
+            if Camera in Rotate_Around_Cameras.Rotate_Around_Camera'Class then
                Rotate_Around_Cameras.Rotate_Around_Camera'Class
-                 (Camera.all).Set_Radius
+                 (Camera).Set_Radius
                     (case Current_Viewed_Object is
                        when Sphere_Kind | Satellite_Kind => View_Object_Distance,
                        when Planet_Kind                  => 20_000_000.0);
@@ -407,9 +411,9 @@ begin
          FB_3.Attach (Texture_3);
          FB_4.Attach (Texture_4);
 
-         if Current_Camera.all in Rotate_Around_Cameras.Rotate_Around_Camera'Class then
+         if Current_Camera in Rotate_Around_Cameras.Rotate_Around_Camera'Class then
             Rotate_Around_Cameras.Rotate_Around_Camera'Class
-              (Current_Camera.all).Set_Angles
+              (Current_Camera).Set_Angles
                  (View_Azimuth_Angle_Radians, View_Zenith_Angle_Radians);
          end if;
 
@@ -449,7 +453,7 @@ begin
             Axes_Sizes      : constant Buffer := Create_Buffer
               (Mutable_Buffer_Flags, Orka.Types.Single_Type, 1);
 
-            S_S_A : constant GL.Types.Single_Array :=
+            S_S_A : constant Orka.Float_32_Array :=
               (Orka.Float_32 (Planets.Earth.Planet.Semi_Major_Axis / Earth.Length_Unit_In_Meters),
                Orka.Float_32 (Planets.Earth.Planet.Flattening));
 
@@ -474,15 +478,13 @@ begin
             package Loops is new Orka.Loops
               (Time_Step   => Ada.Real_Time.Microseconds (2_083),
                Frame_Limit => Ada.Real_Time.Microseconds (16_667),
-               Camera      => Current_Camera,
+               Camera      => Current_Camera'Unchecked_Access,
                Job_Manager => Demo.Job_System);
 
             procedure Render_Scene
               (Scene  : not null Orka.Behaviors.Behavior_Array_Access;
                Camera : Orka.Cameras.Camera_Ptr)
             is
-               P_I : Orka.Inputs.Pointers.Pointer_Input_Ptr renames Window.Pointer_Input;
-
                use Orka.Transforms.Doubles.Vectors;
                use Orka.Transforms.Doubles.Vector_Conversions;
                use type Quaternions.Quaternion;
@@ -490,7 +492,7 @@ begin
 
                Earth_Rotation : constant Quaternions.Quaternion :=
                  Quaternions.R (Orka.Transforms.Doubles.Vectors.Normalize ((0.0, 0.0, 1.0, 0.0)),
-                   -2.0 * Ada.Numerics.Pi * (Planet_Rotations + GL.Types.Double
+                   -2.0 * Ada.Numerics.Pi * (Planet_Rotations + Orka.Float_64
                      (To_Duration (Clock - Start_Time) /
                        (Planets.Earth.Planet.Sidereal / Earth_Rotation_Speedup))));
 
@@ -525,7 +527,8 @@ begin
                if Window.Resize then
                   Window.Resize := False;
 
-                  FB_D := Orka.Rendering.Framebuffers.Get_Default_Framebuffer (Window);
+                  FB_D := Orka.Rendering.Framebuffers.Create_Default_Framebuffer
+                    (Window.Width, Window.Height);
                   FB_D.Set_Default_Values ((Color => (0.0, 0.0, 0.0, Alpha), others => <>));
                   Demo.Messages.Log (Debug, "FB default window, new size: " &
                     Window.Width'Image & Window.Height'Image);
@@ -561,7 +564,7 @@ begin
                         2 | 4  => 0.03,
                         5 .. 6 => 0.0);
 
-                     K_RC : constant GL.Types.Single := Filtering.RC (10.0);
+                     K_RC : constant Orka.Float_32 := Filtering.RC (10.0);
 
                      Last_State : constant Orka.Inputs.Joysticks.Joystick_State := JS.Last_State;
                      --  TODO Shouldn't this be Current_State?
@@ -576,7 +579,7 @@ begin
 
                         Value := Filtering.Low_Pass_Filter
                          (Value, Last_State.Axes (Index),
-                           K_RC, GL.Types.Single (DT));
+                           K_RC, Orka.Float_32 (DT));
                      end Process_Axis;
                   begin
                      JS.Update_State (Process_Axis'Access);
@@ -713,7 +716,7 @@ begin
                            if Value (Index) = Right_Shoulder
                              and State.Buttons (Index) = Pressed
                            then
-                              Exposure := GL.Types.Single'Max (0.0, Exposure - 0.1);
+                              Exposure := Orka.Float_32'Max (0.0, Exposure - 0.1);
                            end if;
                         end if;
 
@@ -727,7 +730,7 @@ begin
                            if Value (Index) = Right_Shoulder
                              and State.Buttons (Index) = Pressed
                            then
-                              Exposure := GL.Types.Single'Max (0.0, Exposure - 0.01);
+                              Exposure := Orka.Float_32'Max (0.0, Exposure - 0.01);
                            end if;
                         end if;
                      end loop;
@@ -740,17 +743,17 @@ begin
 
                      State : constant Orka.Inputs.Joysticks.Joystick_State := JS.Current_State;
 
-                     C_X : constant GL.Types.Double :=
-                       GL.Types.Double (State.Axes (Index (Left_Stick_X)));
-                     C_Y : constant GL.Types.Double :=
-                       GL.Types.Double (State.Axes (Index (Left_Stick_Y)));
-                     C_Z : constant GL.Types.Double :=
-                       GL.Types.Double (State.Axes (Index (Right_Trigger)));
+                     C_X : constant Orka.Float_64 :=
+                       Orka.Float_64 (State.Axes (Index (Left_Stick_X)));
+                     C_Y : constant Orka.Float_64 :=
+                       Orka.Float_64 (State.Axes (Index (Left_Stick_Y)));
+                     C_Z : constant Orka.Float_64 :=
+                       Orka.Float_64 (State.Axes (Index (Right_Trigger)));
 
-                     C_L : constant GL.Types.Double :=
+                     C_L : constant Orka.Float_64 :=
                        EF.Sqrt (C_X ** 2 + C_Y ** 2);
 
-                     C_L_A : constant GL.Types.Double :=
+                     C_L_A : constant Orka.Float_64 :=
                         (if C_Y = 0.0 and C_X = 0.0 then
                            0.0
                          else
@@ -769,8 +772,8 @@ begin
 --                        1.0);
 
                      declare
-                        S_Z : constant GL.Types.Double := GL.Types.Double (Step_Y) * 0.05;
-                        Sun_Distance_AU : constant GL.Types.Double :=
+                        S_Z : constant Orka.Float_64 := Orka.Float_64 (Step_Y) * 0.05;
+                        Sun_Distance_AU : constant Orka.Float_64 :=
                           ((1.0 - S_Z) * (1.0 - Min_AU) + Min_AU) * Planets.AU;
                      begin
                         Atmosphere_Types.No_Behavior (Sun.all).Position :=
@@ -791,8 +794,8 @@ begin
                   --
                   --  Try to Set earth center relative to camera and set distance to zero
 
---                  Distance : constant GL.Types.Double := Magnitude (TP - Camera.View_Position);
-                  Distance : constant GL.Types.Double := Length (Sun.Position - Planet.Position);
+--                  Distance : constant Orka.Float_64 := Magnitude (TP - Camera.View_Position);
+                  Distance : constant Orka.Float_64 := Length (Sun.Position - Planet.Position);
 
                   use Orka.Logging;
                begin
@@ -856,11 +859,12 @@ begin
                       * (Camera.View_Position - Planet.Position));
 
                   F_ECTC : constant Matrices.Vector4 :=
-                    Planets.Earth.Planet.Flattened_Vector (Earth_Center_To_Camera, 0.0);
+                    Planets.Earth.Planet.Flattened_Vector
+                      (Earth_Center_To_Camera, 0.0);
 
-                  Length_PTC : constant GL.Types.Double :=
+                  Length_PTC : constant Orka.Float_64 :=
                     Length (Planet.Position - Camera.View_Position);
-                  Length_PTS : constant GL.Types.Double :=
+                  Length_PTS : constant Orka.Float_64 :=
                     Length ((F_ECTC (Orka.Y), F_ECTC (Orka.Z), F_ECTC (Orka.X), 0.0));
                begin
                   Height_Above_Surface := Length_PTC - Length_PTS;
@@ -882,8 +886,8 @@ begin
                Timer_3.Start;
                if Render_Debug_Geometry then
                   declare
-                     Radius   : constant GL.Types.Single :=
-                       GL.Types.Single
+                     Radius   : constant Orka.Float_32 :=
+                       Orka.Float_32
                          (Planets.Earth.Planet.Semi_Major_Axis / Earth.Length_Unit_In_Meters);
 
                      --  Bounding boxes
@@ -900,7 +904,7 @@ begin
                      A_T : constant Orka.Types.Singles.Matrix4_Array :=
                        (Move_To_Earth_Center,
                         Move_To_Earth_Center * Orientation_ECEF);
-                     A_S : constant GL.Types.Single_Array := (1 => Radius);
+                     A_S : constant Orka.Float_32_Array := (1 => Radius);
 
                      --  Spheres
                      S_T_A : constant Orka.Types.Singles.Matrix4_Array :=
@@ -929,7 +933,7 @@ begin
 
                               V : constant Orka.Types.Singles.Vector4 :=
                                 Convert (Foo * PO.Int.State.Velocity
-                                    * (1.0 / Earth.Length_Unit_In_Meters));
+                                  * (1.0 / Earth.Length_Unit_In_Meters));
                            begin
                               return ((0.0, 0.0, 0.0, 0.0), P, P, P + (50.0 * V));
                            end;
@@ -1018,20 +1022,20 @@ begin
 
                      BBox.Render
                        (View       => Camera.View_Matrix,
-                        Proj       => Lens.Projection_Matrix,
+                        Proj       => Camera.Projection_Matrix,
                         Transforms => BBox_Transforms,
                         Bounds     => BBox_Bounds);
 
                      Axis.Render
                        (View       => Camera.View_Matrix,
-                        Proj       => Lens.Projection_Matrix,
+                        Proj       => Camera.Projection_Matrix,
                         Transforms => Axes_Transforms,
                         Sizes      => Axes_Sizes);
 
                      if Show_White_Grid then
                         Debug_Sphere.Render
                           (View       => Camera.View_Matrix,
-                           Proj       => Lens.Projection_Matrix,
+                           Proj       => Camera.Projection_Matrix,
                            Transforms => Sphere_Transforms_A,
                            Spheres    => Sphere_Params_A);
                      end if;
@@ -1039,7 +1043,7 @@ begin
                      if Show_Stationary_Targets then
                         Line.Render
                           (View       => Camera.View_Matrix,
-                           Proj       => Lens.Projection_Matrix,
+                           Proj       => Camera.Projection_Matrix,
                            Transforms => Line_Transforms_ECEF,
                            Colors     => Line_Colors,
                            Points     => Line_Points_ECEF);
@@ -1048,7 +1052,7 @@ begin
                      if Show_Satellites then
                         Line.Render
                           (View       => Camera.View_Matrix,
-                           Proj       => Lens.Projection_Matrix,
+                           Proj       => Camera.Projection_Matrix,
                            Transforms => Line_Transforms_ECI,
                            Colors     => Line_Colors,
                            Points     => Line_Points_ECI);
@@ -1071,17 +1075,17 @@ begin
                     (White_Points);
                else
                   P_2.Uniform ("white_point").Set_Vector
-                    (GL.Types.Single_Array'((1.0, 1.0, 1.0)));
+                    (Orka.Float_32_Array'((1.0, 1.0, 1.0)));
                end if;
 
                if Do_Blur /= None then
                   P_2.Uniform ("screenResolution").Set_Vector
                     (Orka.Types.Singles.Vector4'
-                      (GL.Types.Single (FB_3.Width), GL.Types.Single (FB_3.Height), 0.0, 0.0));
+                      (Orka.Float_32 (FB_3.Width), Orka.Float_32 (FB_3.Height), 0.0, 0.0));
                else
                   P_2.Uniform ("screenResolution").Set_Vector
                     (Orka.Types.Singles.Vector4'
-                      (GL.Types.Single (FB_D.Width), GL.Types.Single (FB_D.Height), 0.0, 0.0));
+                      (Orka.Float_32 (FB_D.Width), Orka.Float_32 (FB_D.Height), 0.0, 0.0));
                end if;
 
                P_2.Uniform ("exposure").Set_Single
@@ -1111,7 +1115,7 @@ begin
                Timer_0.Stop;
 
                if Previous_Viewed_Object /= Current_Viewed_Object then
-                  Update_Viewed_Object (Camera, Current_Viewed_Object);
+                  Update_Viewed_Object (Camera.all, Current_Viewed_Object);
                end if;
 
                Window.Swap_Buffers;
@@ -1154,20 +1158,31 @@ begin
                      raise;
                end Render_Task;
 
+               Did_Rotate_Camera : Boolean := False;
+
                Next_Cursor : AWT.Inputs.Cursors.Pointer_Cursor :=
                  AWT.Inputs.Cursors.Pointer_Cursor'First;
             begin
                Context.Make_Not_Current;
                Render_Task.Start_Rendering;
 
+               System.Multiprocessors.Dispatching_Domains.Set_CPU (1);
                while not Window.Should_Close loop
                   AWT.Process_Events (0.016667);
 
                   declare
+                     Pointer  : constant AWT.Inputs.Pointer_State  := Window.State;
                      Keyboard : constant AWT.Inputs.Keyboard_State := Window.State;
 
+                     use all type AWT.Inputs.Button_State;
                      use all type AWT.Inputs.Keyboard_Button;
+                     use all type AWT.Inputs.Pointer_Button;
+                     use all type AWT.Inputs.Pointer_Mode;
+                     use all type AWT.Inputs.Dimension;
                      use type AWT.Inputs.Cursors.Pointer_Cursor;
+
+                     Rotate_Camera : constant Boolean :=
+                       Pointer.Focused and Pointer.Buttons (Right) = Pressed;
                   begin
                      if Keyboard.Pressed (Key_Escape) then
                         Window.Close;
@@ -1181,6 +1196,19 @@ begin
                              AWT.Inputs.Cursors.Pointer_Cursor'Succ (Next_Cursor));
                         Window.Set_Pointer_Cursor (Next_Cursor);
                      end if;
+
+                     if Rotate_Camera /= Did_Rotate_Camera then
+                        Window.Set_Pointer_Mode (if Rotate_Camera then Locked else Visible);
+                     end if;
+                     Did_Rotate_Camera := Rotate_Camera;
+
+                     --  FIXME Update with PO?
+                     Rotate_Around_Cameras.Rotate_Around_Camera'Class
+                       (Current_Camera).Change_Orientation
+                          (((if Rotate_Camera then Orka.Float_64 (Pointer.Relative (X)) else 0.0),
+                            (if Rotate_Camera then Orka.Float_64 (Pointer.Relative (Y)) else 0.0),
+                            Orka.Float_64 (Pointer.Scroll (Y)),
+                            0.0));
                   end;
                end loop;
                Ada.Text_IO.Put_Line ("Exited event loop in main task");
