@@ -1,4 +1,4 @@
-with Orka;
+with Orka.Integrators;
 
 package body Integrators.RK4 is
 
@@ -28,50 +28,36 @@ package body Integrators.RK4 is
          DX, DP : Vectors.Vector4 := Vectors.Vector4 (Vectors.Zero_Point);
       end record;
 
-      procedure Update (State : in out Linear_State; Motion : Derivative; DT : Double) is
+      function "+" (State : Linear_State; Motion : Derivative) return Linear_State is
+         Result : Linear_State := State;
       begin
-         State.Position := State.Position + Motion.DX * DT;
-         State.Momentum := State.Momentum + Motion.DP * DT;
+         Result.Position := Result.Position + Motion.DX;
+         Result.Momentum := Result.Momentum + Motion.DP;
 
          --  Recompute velocity after updating momentum
-         State.Velocity := State.Momentum * State.Inverse_Mass;
-      end Update;
+         Result.Velocity := Result.Momentum * Result.Inverse_Mass;
 
-      function Evaluate
-        (Initial : Linear_State;
-         Force   : not null access function
-           (State : Linear_State; Time : Double) return Vectors.Vector4;
-         T, DT   : Double;
-         Motion  : Derivative) return Derivative
-      is
-         Next : Linear_State := Initial;
-      begin
-         Update (Next, Motion, DT);
+         return Result;
+      end "+";
 
-         return Result : Derivative do
-            Result.DX := Next.Velocity;
-            Result.DP := Force (Next, T + DT);
-         end return;
-      end Evaluate;
+      function "*" (Left : Orka.Float_64; Right : Derivative) return Derivative is
+        ((DX => Left * Right.DX, DP => Left * Right.DP));
+
+      function "+" (Left, Right : Derivative) return Derivative is
+        ((DX => Left.DX + Right.DX, DP => Left.DP + Right.DP));
+
+      function RK4 is new Orka.Integrators.RK4 (Linear_State, Derivative, Orka.Float_64);
 
       procedure Integrate
         (Current : in out Linear_State;
          Force   : not null access function
-           (State : Linear_State; Time : Double) return Vectors.Vector4;
-         T, DT   : Double)
+           (State : Linear_State; Time : Orka.Float_64) return Vectors.Vector4;
+         T, DT   : Orka.Float_64)
       is
-         Initial, A, B, C, D : Derivative;
-         DX_DT, DP_DT : Vectors.Vector4;
+         function F (Y : Linear_State; DT : Orka.Float_64) return Derivative is
+           ((DX => Y.Velocity, DP => Force (Y, T + DT)));
       begin
-         A := Evaluate (Current, Force, T, 0.0, Initial);
-         B := Evaluate (Current, Force, T, DT * 0.5, A);
-         C := Evaluate (Current, Force, T, DT * 0.5, B);
-         D := Evaluate (Current, Force, T, DT, C);
-
-         DX_DT := 1.0 / 6.0 * (A.DX + 2.0 * (B.DX + C.DX) + D.DX);
-         DP_DT := 1.0 / 6.0 * (A.DP + 2.0 * (B.DP + C.DP) + D.DP);
-
-         Update (Current, (DX => DX_DT, DP => DP_DT), DT);
+         Current := Current + RK4 (Current, DT, F'Access);
       end Integrate;
 
    end Linear_Integrator;
