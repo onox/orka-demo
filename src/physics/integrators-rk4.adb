@@ -87,33 +87,29 @@ package body Integrators.RK4 is
         is (Vectors.Vector4 (Value))
       with Inline;
 
-      procedure Update (State : in out Angular_State; Motion : Derivative; DT : Double) is
+      function "+" (State : Angular_State; Motion : Derivative) return Angular_State is
+         Result : Angular_State := State;
       begin
-         State.Orientation      := Q (V (State.Orientation) + V (Motion.Spin) * DT);
-         State.Angular_Momentum := State.Angular_Momentum + Motion.Torque * DT;
+         --  FIXME Should we do Result.Orientation := Motion.Spin * Result.Orientation?
+         Result.Orientation      := Q (V (Result.Orientation) + V (Motion.Spin));
+         Result.Angular_Momentum := Result.Angular_Momentum + Motion.Torque;
 
          --  Recompute angular velocity after updating angular momentum
-         State.Angular_Velocity := State.Angular_Momentum * State.Inverse_Inertia;
-         State.Orientation := Quaternions.Normalize (State.Orientation);
-         pragma Assert (Quaternions.Normalized (State.Orientation));
-      end Update;
+         Result.Angular_Velocity := Result.Angular_Momentum * Result.Inverse_Inertia;
+         Result.Orientation := Quaternions.Normalize (Result.Orientation);
+         pragma Assert (Quaternions.Normalized (Result.Orientation));
 
-      function Evaluate
-        (Initial : Angular_State;
-         Torque  : not null access function
-           (State : Angular_State; Time : Double) return Vectors.Vector4;
-         T, DT   : Double;
-         Motion  : Derivative) return Derivative
-      is
-         Next : Angular_State := Initial;
-      begin
-         Update (Next, Motion, DT);
+         return Result;
+      end "+";
 
-         return Result : Derivative do
-            Result.Spin   := Q (0.5 * V (Quaternion (Next.Angular_Velocity) * Next.Orientation));
-            Result.Torque := Torque (Next, T + DT);
-         end return;
-      end Evaluate;
+      function "*" (Left : Orka.Float_64; Right : Derivative) return Derivative is
+        ((Spin => Left * Right.Spin, Torque => Left * Right.Torque));
+
+      function "+" (Left, Right : Derivative) return Derivative is
+        ((Spin => Left.Spin + Right.Spin, Torque => Left.Torque + Right.Torque));
+      --  FIXME Should we do Spin => Left.Spin * Right.Spin?
+
+      function RK4 is new Orka.Integrators.RK4 (Angular_State, Derivative, Orka.Float_64);
 
       procedure Integrate
         (Current : in out Angular_State;
@@ -121,19 +117,11 @@ package body Integrators.RK4 is
            (State : Angular_State; Time : Double) return Vectors.Vector4;
          T, DT   : Double)
       is
-         Initial, A, B, C, D : Derivative;
-         D_Spin   : Quaternions.Quaternion;
-         D_Torque : Vectors.Vector4;
+         function F (Y : Angular_State; DT : Orka.Float_64) return Derivative is
+           ((Spin   => Q (0.5 * V (Quaternion (Y.Angular_Velocity) * Y.Orientation)),
+             Torque => Torque (Y, T + DT)));
       begin
-         A := Evaluate (Current, Torque, T, 0.0, Initial);
-         B := Evaluate (Current, Torque, T, DT * 0.5, A);
-         C := Evaluate (Current, Torque, T, DT * 0.5, B);
-         D := Evaluate (Current, Torque, T, DT, C);
-
-         D_Spin   := Q (1.0 / 6.0 * (V (A.Spin) + 2.0 * (V (B.Spin) + V (C.Spin)) + V (D.Spin)));
-         D_Torque := 1.0 / 6.0 * (A.Torque + 2.0 * (B.Torque + C.Torque) + D.Torque);
-
-         Update (Current, (Spin => D_Spin, Torque => D_Torque), DT);
+         Current := Current + RK4 (Current, DT, F'Access);
       end Integrate;
 
    end Angular_Integrator;
