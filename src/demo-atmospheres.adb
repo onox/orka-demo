@@ -22,7 +22,7 @@ package body Demo.Atmospheres is
          Ada.Text_IO.Put_Line ("Precomputing atmosphere. Stay a while and listen...");
          declare
             Atmosphere_Model : constant Model :=
-              Create_Model (Planet_Model'Access, Location_Shaders);
+              Create_Model (Planet_Model, Location_Shaders);
             Textures : constant Precomputed_Textures := Atmosphere_Model.Compute_Textures;
          begin
             Ada.Text_IO.Put_Line ("Precomputed textures for atmosphere");

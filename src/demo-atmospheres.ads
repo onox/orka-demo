@@ -1,4 +1,3 @@
-with Orka.Features.Atmosphere.Earth;
 with Orka.Features.Atmosphere.Rendering;
 with Orka.Resources.Locations;
 with Orka.Behaviors;
