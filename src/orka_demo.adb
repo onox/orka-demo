@@ -18,11 +18,10 @@ with Orka.Contexts.AWT;
 with Orka.Debug;
 with Orka.Features.Atmosphere.Earth;
 with Orka.Features.Terrain.Spheres;
-with Orka.Inputs.Joysticks.Filtering;
-with Orka.Inputs.Joysticks.Gamepads;
 with Orka.Loggers.Terminal;
-with Orka.Logging;
+with Orka.Logging.Default;
 with Orka.Loops;
+with Orka.OS;
 with Orka.Rendering.Buffers;
 with Orka.Rendering.Drawing;
 with Orka.Rendering.Debug.Bounding_Boxes;
@@ -45,7 +44,7 @@ with Orka.Transforms.Doubles.Vectors;
 with Orka.Transforms.Doubles.Vector_Conversions;
 with Orka.Types;
 with Orka.Windows;
-with AWT.Inputs;
+with AWT.Inputs.Gamepads.Filtering;
 with AWT.Windows;
 
 with Atmosphere_Types.Objects;
@@ -86,7 +85,7 @@ procedure Orka_Demo is
 
    type View_Object_Kind is (Sphere_Kind, Planet_Kind, Satellite_Kind);
 
-   Previous_Viewed_Object, Current_Viewed_Object : View_Object_Kind := Sphere_Kind;
+   Previous_Viewed_Object, Current_Viewed_Object : View_Object_Kind := Satellite_Kind;
 
    View_Azimuth_Angle_Radians : constant := 0.0 * Ada.Numerics.Pi;
    View_Zenith_Angle_Radians  : constant := 0.1 * Ada.Numerics.Pi;
@@ -120,6 +119,11 @@ procedure Orka_Demo is
 
    Exposure : Orka.Float_32 := 10.0;
 
+   use all type Orka.Logging.Default_Module;
+   use all type Orka.Logging.Severity;
+
+   procedure Log is new Orka.Logging.Default.Generic_Log (Application);
+
    function Clamp (Value : GL.Types.Int) return GL.Types.Int is
      (GL.Types.Int'Max (0, GL.Types.Int'Min (Value, 20)));
 
@@ -129,8 +133,6 @@ procedure Orka_Demo is
 
    package LE renames GL.Low_Level.Enums;
    package MC renames Orka.Transforms.Doubles.Matrix_Conversions;
-   package GP renames Orka.Inputs.Joysticks.Gamepads;
-   package Filtering renames Orka.Inputs.Joysticks.Filtering;
 
    package BBoxes  renames Orka.Rendering.Debug.Bounding_Boxes;
    package Lines   renames Orka.Rendering.Debug.Lines;
@@ -174,9 +176,8 @@ procedure Orka_Demo is
        (Version => (4, 2),
         Flags   => (Debug => True, others => False));
 
---   Window : aliased Orka.Windows.Window'Class := Demo.Create_Window
-   Window : aliased Demo.Test_Window :=
-     Demo.Create_Window (Context, Window_Width, Window_Height, Resizable => False);
+   Window : constant Orka.Windows.Window'Class
+     := Orka.Contexts.AWT.Create_Window (Context, Width, Height);
 
    use Orka.Resources;
    use type Orka.Float_64;
@@ -198,14 +199,7 @@ procedure Orka_Demo is
 
    -----------------------------------------------------------------------------
 
-   JS : Orka.Inputs.Joysticks.Joystick_Input_Access;
-
-   --  FIXME
---   JS_Manager : constant Orka.Inputs.Joysticks.Joystick_Manager_Ptr :=
---     Orka.Inputs.GLFW.Create_Joystick_Manager;
-
    use type Orka.Float_32;
-   use type Orka.Inputs.Joysticks.Joystick_Input_Access;
 begin
    Orka.Logging.Set_Logger (Orka.Loggers.Terminal.Create_Logger (Level => Orka.Loggers.Debug));
    Orka.Debug.Set_Log_Messages (Enable => True, Raise_API_Error => True);
@@ -220,27 +214,17 @@ begin
         := Convert (Orka.Resources.Byte_Array'(Location_Data.Read_Data
              ("gamecontrollerdb.txt").Get));
    begin
-      --  FIXME
-      null;
---      Glfw.Input.Joysticks.Update_Gamepad_Mappings (Mappings);
+      AWT.Inputs.Gamepads.Set_Mappings
+        (Orka.Resources.Convert (Location_Data.Read_Data ("gamecontrollerdb.txt").Get));
+      Log (Success, "Mappings added");
    end;
 
---   JS_Manager.Acquire (JS);
+   AWT.Inputs.Gamepads.Initialize;
 
-   if JS /= null then
-      Ada.Text_IO.Put_Line ("Joystick:");
-      Ada.Text_IO.Put_Line ("  Name: " & JS.Name);
-      Ada.Text_IO.Put_Line ("  GUID: " & JS.GUID);
-      Ada.Text_IO.Put_Line ("  Present: " & JS.Is_Present'Image);
-      Ada.Text_IO.Put_Line ("  Gamepad: " & JS.Is_Gamepad'Image);
-   else
-      Ada.Text_IO.Put_Line ("No joystick present");
-   end if;
-
---   if JS = null then
---      JS := Orka.Inputs.Joysticks.Default.Create_Joystick_Input (Window.Pointer_Input,
---        (0.01, 0.01, 0.01, 0.01));
---   end if;
+   AWT.Inputs.Gamepads.Poll (DT => 0.0);
+   for Gamepad of AWT.Inputs.Gamepads.Gamepads loop
+      Gamepad.Log_Information;
+   end loop;
 
    declare
       use Orka.Features.Atmosphere;
@@ -477,7 +461,8 @@ begin
 
             package Loops is new Orka.Loops
               (Time_Step   => Ada.Real_Time.Microseconds (2_083),
-               Frame_Limit => Ada.Real_Time.Microseconds (16_667),
+--               Frame_Limit => Ada.Real_Time.Microseconds (16_667),
+               Frame_Limit => Ada.Real_Time.Microseconds (33_334),
                Camera      => Current_Camera'Unchecked_Access,
                Job_Manager => Demo.Job_System);
 
@@ -522,15 +507,12 @@ begin
                DT       : constant Duration := To_Duration (New_Time - Current_Time);
 
                Alpha : constant Orka.Float_32 := (if Window.State.Transparent then 0.5 else 1.0);
-               use all type Orka.Logging.Severity;
             begin
-               if Window.Resize then
-                  Window.Resize := False;
-
+               if Window.Framebuffer_Resized then
                   FB_D := Orka.Rendering.Framebuffers.Create_Default_Framebuffer
                     (Window.Width, Window.Height);
                   FB_D.Set_Default_Values ((Color => (0.0, 0.0, 0.0, Alpha), others => <>));
-                  Demo.Messages.Log (Debug, "FB default window, new size: " &
+                  Demo.Log (Debug, "FB default window, new size: " &
                     Window.Width'Image & Window.Height'Image);
                end if;
 
@@ -557,231 +539,6 @@ begin
                FB_1.Use_Framebuffer;
                FB_1.Clear ((Color | Depth => True, others => False));
 
-               if JS /= null and then JS.Is_Present then
-                  declare
-                     Dead_Zones : constant array (1 .. 6) of Orka.Inputs.Joysticks.Axis_Position :=
-                       (1 | 3  => 0.05,
-                        2 | 4  => 0.03,
-                        5 .. 6 => 0.0);
-
-                     K_RC : constant Orka.Float_32 := Filtering.RC (10.0);
-
-                     Last_State : constant Orka.Inputs.Joysticks.Joystick_State := JS.Last_State;
-                     --  TODO Shouldn't this be Current_State?
-
-                     procedure Process_Axis
-                       (Value : in out Orka.Inputs.Joysticks.Axis_Position;
-                        Index :        Positive)
-                     is
-                        DZ : constant Orka.Inputs.Joysticks.Axis_Position := Dead_Zones (Index);
-                     begin
-                        Value := Filtering.Dead_Zone (Value, DZ);
-
-                        Value := Filtering.Low_Pass_Filter
-                         (Value, Last_State.Axes (Index),
-                           K_RC, Orka.Float_32 (DT));
-                     end Process_Axis;
-                  begin
-                     JS.Update_State (Process_Axis'Access);
-                  end;
-
-                  declare
-                     State : constant Orka.Inputs.Joysticks.Joystick_State := JS.Current_State;
-                     Last_State : constant Orka.Inputs.Joysticks.Joystick_State := JS.Last_State;
-                     use all type Orka.Inputs.Joysticks.Button_State;
-                     use GP;
-
-                     --  FIXME
-                     subtype Gamepad_Button_Index is Positive range 1 .. 15;
-
-                     function Value (Value : Gamepad_Button_Index) return GP.Button is
-                       (GP.Button'Val (Value - Gamepad_Button_Index'First));
-                  begin
-                     for Index in 1 .. State.Button_Count loop
-                        if State.Buttons (Index) /= Last_State.Buttons (Index) then
-                           if Value (Index) = Right_Pad_Left
-                             and State.Buttons (Index) = Pressed
-                           then
-                              Freeze_Terrain_Update := not Freeze_Terrain_Update;
-                           end if;
-
-                           if Value (Index) = Right_Pad_Right
-                             and State.Buttons (Index) = Pressed
-                           then
-                              Do_Blur := (if Do_Blur /= Blur_Kind'Last then
-                                            Blur_Kind'Succ (Do_Blur)
-                                          else
-                                            Blur_Kind'First);
-                           end if;
-
-                           if Value (Index) = Right_Pad_Up
-                             and State.Buttons (Index) = Pressed
-                           then
-                              Show_Terrain_Wireframe := not Show_Terrain_Wireframe;
-                           end if;
-
-                           if Value (Index) = Right_Pad_Down
-                             and State.Buttons (Index) = Pressed
-                           then
-                              Current_Viewed_Object :=
-                                (if Current_Viewed_Object /= View_Object_Kind'Last then
-                                   View_Object_Kind'Succ (Current_Viewed_Object)
-                                 else
-                                   View_Object_Kind'First);
-                           end if;
-
-                           if Value (Index) = Left_Pad_Up
-                             and State.Buttons (Index) = Pressed
-                             and State.Buttons (GP.Index (Center_Right)) = Pressed
-                           then
-                              Step_Y := Clamp (Step_Y - 1);
-                           end if;
-
-                           if Value (Index) = Left_Pad_Down
-                             and State.Buttons (Index) = Pressed
-                             and State.Buttons (GP.Index (Center_Right)) = Pressed
-                           then
-                              Step_Y := Clamp (Step_Y + 1);
-                           end if;
-
-                           if Value (Index) = Left_Pad_Up
-                             and State.Buttons (Index) = Pressed
-                             and State.Buttons (GP.Index (Center_Right)) = Released
-                             and Terrain_Parameters.Meshlet_Subdivision
-                                   < Orka.Features.Terrain.Meshlet_Subdivision_Depth'Last
-                           then
-                              Terrain_Parameters.Meshlet_Subdivision :=
-                                 Terrain_Parameters.Meshlet_Subdivision + 1;
-                           end if;
-
-                           if Value (Index) = Left_Pad_Down
-                             and State.Buttons (Index) = Pressed
-                             and State.Buttons (GP.Index (Center_Right)) = Released
-                             and Terrain_Parameters.Meshlet_Subdivision
-                                   > Orka.Features.Terrain.Meshlet_Subdivision_Depth'First
-                           then
-                              Terrain_Parameters.Meshlet_Subdivision :=
-                                 Terrain_Parameters.Meshlet_Subdivision - 1;
-                           end if;
-
-                           if Value (Index) = Left_Pad_Left
-                             and State.Buttons (Index) = Pressed
-                             and State.Buttons (GP.Index (Center_Right)) = Released
-                             and Terrain_Parameters.Min_LoD_Standard_Dev
-                                   <= 0.9
-                           then
-                              Terrain_Parameters.Min_LoD_Standard_Dev :=
-                                 Terrain_Parameters.Min_LoD_Standard_Dev + 0.1;
-                           end if;
-
-                           if Value (Index) = Left_Pad_Right
-                             and State.Buttons (Index) = Pressed
-                             and State.Buttons (GP.Index (Center_Right)) = Released
-                             and Terrain_Parameters.Min_LoD_Standard_Dev
-                                   >= 0.1
-                           then
-                              Terrain_Parameters.Min_LoD_Standard_Dev :=
-                                 Terrain_Parameters.Min_LoD_Standard_Dev - 0.1;
-                           end if;
-
-                           if Value (Index) = Left_Pad_Left
-                             and State.Buttons (Index) = Pressed
-                             and State.Buttons (GP.Index (Center_Right)) = Pressed
-                             and Blur_Kernel_Size /= Blur_Kernel'First
-                           then
-                              Blur_Kernel_Size := Blur_Kernel'Pred (Blur_Kernel_Size);
-                           end if;
-
-                           if Value (Index) = Left_Pad_Right
-                             and State.Buttons (Index) = Pressed
-                             and State.Buttons (GP.Index (Center_Right)) = Pressed
-                             and Blur_Kernel_Size /= Blur_Kernel'Last
-                           then
-                              Blur_Kernel_Size := Blur_Kernel'Succ (Blur_Kernel_Size);
-                           end if;
-
-                           if Value (Index) = Center_Left
-                             and State.Buttons (Index) = Pressed
-                           then
-                              Use_Smap := not Use_Smap;
-                              Uniform_Smap.Set_Boolean (Use_Smap);
-                           end if;
-
-                           if Value (Index) = Left_Shoulder
-                             and State.Buttons (Index) = Pressed
-                           then
-                              Exposure := Exposure + 0.1;
-                           end if;
-
-                           if Value (Index) = Right_Shoulder
-                             and State.Buttons (Index) = Pressed
-                           then
-                              Exposure := Orka.Float_32'Max (0.0, Exposure - 0.1);
-                           end if;
-                        end if;
-
-                        if State.Buttons (Index) = Last_State.Buttons (Index) then
-                           if Value (Index) = Left_Shoulder
-                             and State.Buttons (Index) = Pressed
-                           then
-                              Exposure := Exposure + 0.01;
-                           end if;
-
-                           if Value (Index) = Right_Shoulder
-                             and State.Buttons (Index) = Pressed
-                           then
-                              Exposure := Orka.Float_32'Max (0.0, Exposure - 0.01);
-                           end if;
-                        end if;
-                     end loop;
-                  end;
-               end if;
-
-               if JS /= null then
-                  declare
-                     use Orka.Inputs.Joysticks.Gamepads;
-
-                     State : constant Orka.Inputs.Joysticks.Joystick_State := JS.Current_State;
-
-                     C_X : constant Orka.Float_64 :=
-                       Orka.Float_64 (State.Axes (Index (Left_Stick_X)));
-                     C_Y : constant Orka.Float_64 :=
-                       Orka.Float_64 (State.Axes (Index (Left_Stick_Y)));
-                     C_Z : constant Orka.Float_64 :=
-                       Orka.Float_64 (State.Axes (Index (Right_Trigger)));
-
-                     C_L : constant Orka.Float_64 :=
-                       EF.Sqrt (C_X ** 2 + C_Y ** 2);
-
-                     C_L_A : constant Orka.Float_64 :=
-                        (if C_Y = 0.0 and C_X = 0.0 then
-                           0.0
-                         else
-                           Orka.Transforms.Doubles.Vectors.To_Degrees (EF.Arctan (C_X, C_Y)));
-                  begin
-                     if abs C_X > 0.02 or abs C_Y > 0.02 then
-                        Ada.Text_IO.Put_Line
-                          (Image_D (C_X) & " " & Image_D (C_Y) & " = " & C_L'Image &
-                           " d: " & Image_D (C_L_A));
-                     end if;
-                     Planet_Rotations := Planet_Rotations + C_X * 0.001;
---                     Atmosphere_Types.No_Behavior (Planet.all).Position :=
---                       (Earth.Bottom_Radius * C_X,
---                        Earth.Bottom_Radius * C_Y,
---                        Earth.Bottom_Radius * 0.0,
---                        1.0);
-
-                     declare
-                        S_Z : constant Orka.Float_64 := Orka.Float_64 (Step_Y) * 0.05;
-                        Sun_Distance_AU : constant Orka.Float_64 :=
-                          ((1.0 - S_Z) * (1.0 - Min_AU) + Min_AU) * Planets.AU;
-                     begin
-                        Atmosphere_Types.No_Behavior (Sun.all).Position :=
-                          (0.0, 0.0, Sun_Distance_AU, 1.0);
-                     end;
-                  end;
-               end if;
-
 --               if Camera.all in Observing_Camera'Class then
 --                  TP := Observing_Camera'Class (Camera.all).Target_Position;
 --               elsif Camera.all in First_Person_Camera'Class then
@@ -795,7 +552,7 @@ begin
                   --  Try to Set earth center relative to camera and set distance to zero
 
 --                  Distance : constant Orka.Float_64 := Magnitude (TP - Camera.View_Position);
-                  Distance : constant Orka.Float_64 := Length (Sun.Position - Planet.Position);
+                  Distance : constant Orka.Float_64 := Norm (Sun.Position - Planet.Position);
 
                   use Orka.Logging;
                begin
@@ -823,7 +580,7 @@ begin
                     & "Sat:"
                     & Integer'Image (Integer (Atmosphere_Types.Physics_Behavior
                         (Object_01.all).FDM.Altitude)) & " m "
-                    & Image_D (Matrices.Vectors.Length
+                    & Image_D (Matrices.Vectors.Norm
                         (Atmosphere_Types.Physics_Behavior
                           (Object_01.all).Int.State.Velocity)) & " m/s"
                     );
@@ -863,9 +620,9 @@ begin
                       (Earth_Center_To_Camera, 0.0);
 
                   Length_PTC : constant Orka.Float_64 :=
-                    Length (Planet.Position - Camera.View_Position);
+                    Norm (Planet.Position - Camera.View_Position);
                   Length_PTS : constant Orka.Float_64 :=
-                    Length ((F_ECTC (Orka.Y), F_ECTC (Orka.Z), F_ECTC (Orka.X), 0.0));
+                    Norm ((F_ECTC (Orka.Y), F_ECTC (Orka.Z), F_ECTC (Orka.X), 0.0));
                begin
                   Height_Above_Surface := Length_PTC - Length_PTS;
 
@@ -1158,6 +915,220 @@ begin
                      raise;
                end Render_Task;
 
+               task Poll_Gamepads;
+
+               task body Poll_Gamepads is
+                  Interval : constant Time_Span := Milliseconds (4);
+                  DT       : constant Duration := To_Duration (Interval);
+
+                  Next_Time : Time := Clock + Interval;
+
+                  use all type AWT.Inputs.Gamepads.Gamepad_Button;
+                  use all type AWT.Inputs.Gamepads.Gamepad_Axis;
+                  use all type AWT.Inputs.Gamepads.Gamepad_Trigger;
+
+                  Dead_Zones : constant AWT.Inputs.Gamepads.Gamepad_Axes :=
+                    (Stick_Left_X | Stick_Right_X  => 0.049987792968750,
+                     Stick_Left_Y | Stick_Right_Y  => 0.029998779296875);
+                  K_RC : constant Orka.Float_32 := AWT.Inputs.Gamepads.Filtering.RC (10.0);
+
+                  Last_State : AWT.Inputs.Gamepads.Gamepad_Axes;
+
+                  function Process_Axis
+                    (Value : AWT.Inputs.Gamepads.Axis_Position;
+                     Axis  : AWT.Inputs.Gamepads.Gamepad_Axis)
+                  return AWT.Inputs.Gamepads.Axis_Position is
+                     Result : constant AWT.Inputs.Gamepads.Axis_Position :=
+                       AWT.Inputs.Gamepads.Filtering.Dead_Zone (Value, Dead_Zones (Axis));
+                  begin
+                     return AWT.Inputs.Gamepads.Filtering.Low_Pass_Filter
+                       (Result, Last_State (Axis), K_RC, Orka.Float_32 (DT));
+                  end Process_Axis;
+               begin
+                  while not Window.Should_Close loop
+                     AWT.Inputs.Gamepads.Poll (DT);
+
+                     declare
+                        Gamepads : constant AWT.Inputs.Gamepads.Gamepad_Array :=
+                          AWT.Inputs.Gamepads.Gamepads;
+                     begin
+                        if Gamepads'Length > 0 then
+                           declare
+                              Gamepad : AWT.Inputs.Gamepads.Gamepad_Ptr renames Gamepads (1);
+                              State : constant AWT.Inputs.Gamepads.Gamepad_State := Gamepad.State;
+
+                              Filtered_Axes : AWT.Inputs.Gamepads.Gamepad_Axes;
+
+                              use all type AWT.Inputs.Button_State;
+                           begin
+                              for I in Filtered_Axes'Range loop
+                                 Filtered_Axes (I) := Process_Axis (State.Axes (I), I);
+                              end loop;
+
+                              Last_State := Filtered_Axes;
+
+                              declare
+                                 C_X : constant Orka.Float_64 :=
+                                   Orka.Float_64 (Filtered_Axes (Stick_Left_X));
+                                 C_Y : constant Orka.Float_64 :=
+                                   Orka.Float_64 (Filtered_Axes (Stick_Left_Y));
+--                                 C_Z : constant Orka.Float_64 :=
+--                                   Orka.Float_64 (State.Triggers (Trigger_Right));
+
+                                 C_L : constant Orka.Float_64 :=
+                                   EF.Sqrt (C_X ** 2 + C_Y ** 2);
+
+                                 C_L_A : constant Orka.Float_64 :=
+                                    (if C_Y = 0.0 and C_X = 0.0 then
+                                       0.0
+                                     else
+                                       Orka.Transforms.Doubles.Vectors.To_Degrees
+                                         (EF.Arctan (C_X, C_Y)));
+                              begin
+                                 if abs C_X > 0.02 or abs C_Y > 0.02 then
+                                    Orka.OS.Put_Line
+                                      (Image_D (C_X) & " " & Image_D (C_Y) & " = " & C_L'Image &
+                                       " d: " & Image_D (C_L_A));
+                                 end if;
+                                 Planet_Rotations := Planet_Rotations + C_X * 0.001;
+--                                 Atmosphere_Types.No_Behavior (Planet.all).Position :=
+--                                   (Earth.Bottom_Radius * C_X,
+--                                    Earth.Bottom_Radius * C_Y,
+--                                    Earth.Bottom_Radius * 0.0,
+--                                    1.0);
+
+                                 declare
+                                    S_Z : constant Orka.Float_64 := Orka.Float_64 (Step_Y) * 0.05;
+                                    Sun_Distance_AU : constant Orka.Float_64 :=
+                                      ((1.0 - S_Z) * (1.0 - Min_AU) + Min_AU) * Planets.AU;
+                                 begin
+                                    Atmosphere_Types.No_Behavior (Sun.all).Position :=
+                                      (0.0, 0.0, Sun_Distance_AU, 1.0);
+                                 end;
+                              end;
+
+                              if State.Pressed (Action_Left) then
+                                 Freeze_Terrain_Update := not Freeze_Terrain_Update;
+                              end if;
+
+                              if State.Pressed (Action_Right) then
+                                 Do_Blur := (if Do_Blur /= Blur_Kind'Last then
+                                               Blur_Kind'Succ (Do_Blur)
+                                             else
+                                               Blur_Kind'First);
+                              end if;
+
+                              if State.Pressed (Action_Up) then
+                                 Show_Terrain_Wireframe := not Show_Terrain_Wireframe;
+                              end if;
+
+                              if State.Pressed (Action_Down) then
+                                 Current_Viewed_Object :=
+                                   (if Current_Viewed_Object /= View_Object_Kind'Last then
+                                      View_Object_Kind'Succ (Current_Viewed_Object)
+                                    else
+                                      View_Object_Kind'First);
+                              end if;
+
+                              if State.Pressed (Direction_Up)
+                                and State.Buttons (Center_Right) = Pressed
+                              then
+                                 Step_Y := Clamp (Step_Y - 1);
+                              end if;
+
+                              if State.Pressed (Direction_Down)
+                                and State.Buttons (Center_Right) = Pressed
+                              then
+                                 Step_Y := Clamp (Step_Y + 1);
+                              end if;
+
+                              if State.Pressed (Direction_Up)
+                                and State.Buttons (Center_Right) = Released
+                                and Terrain_Parameters.Meshlet_Subdivision
+                                      < Orka.Features.Terrain.Meshlet_Subdivision_Depth'Last
+                              then
+                                 Terrain_Parameters.Meshlet_Subdivision :=
+                                    Terrain_Parameters.Meshlet_Subdivision + 1;
+                              end if;
+
+                              if State.Pressed (Direction_Down)
+                                and State.Buttons (Center_Right) = Released
+                                and Terrain_Parameters.Meshlet_Subdivision
+                                      > Orka.Features.Terrain.Meshlet_Subdivision_Depth'First
+                              then
+                                 Terrain_Parameters.Meshlet_Subdivision :=
+                                    Terrain_Parameters.Meshlet_Subdivision - 1;
+                              end if;
+
+                              if State.Pressed (Direction_Left)
+                                and State.Buttons (Center_Right) = Released
+                                and Terrain_Parameters.Min_LoD_Standard_Dev <= 0.9
+                              then
+                                 Terrain_Parameters.Min_LoD_Standard_Dev :=
+                                    Terrain_Parameters.Min_LoD_Standard_Dev + 0.1;
+                              end if;
+
+                              if State.Pressed (Direction_Right)
+                                and State.Buttons (Center_Right) = Released
+                                and Terrain_Parameters.Min_LoD_Standard_Dev >= 0.1
+                              then
+                                 Terrain_Parameters.Min_LoD_Standard_Dev :=
+                                    Terrain_Parameters.Min_LoD_Standard_Dev - 0.1;
+                              end if;
+
+                              if State.Pressed (Direction_Left)
+                                and State.Buttons (Center_Right) = Pressed
+                                and Blur_Kernel_Size /= Blur_Kernel'First
+                              then
+                                 Blur_Kernel_Size := Blur_Kernel'Pred (Blur_Kernel_Size);
+                              end if;
+
+                              if State.Pressed (Direction_Right)
+                                and State.Buttons (Center_Right) = Pressed
+                                and Blur_Kernel_Size /= Blur_Kernel'Last
+                              then
+                                 Blur_Kernel_Size := Blur_Kernel'Succ (Blur_Kernel_Size);
+                              end if;
+
+                              if State.Pressed (Center_Left) then
+                                 Use_Smap := not Use_Smap;
+                                 Uniform_Smap.Set_Boolean (Use_Smap);
+                              end if;
+
+                              if State.Pressed (Shoulder_Left) then
+                                 Exposure := Exposure + 0.1;
+                              end if;
+
+                              if State.Pressed (Shoulder_Right) then
+                                 Exposure := Orka.Float_32'Max (0.0, Exposure - 0.1);
+                              end if;
+
+                              if not State.Pressed (Shoulder_Left)
+                                and State.Buttons (Shoulder_Left) = Pressed
+                              then
+                                 Exposure := Exposure + 0.01;
+                              end if;
+
+                              if not State.Pressed (Shoulder_Right)
+                                and State.Buttons (Shoulder_Right) = Pressed
+                              then
+                                 Exposure := Orka.Float_32'Max (0.0, Exposure - 0.01);
+                              end if;
+                           end;
+                        end if;
+                     end;
+
+                     delay until Next_Time;
+                     Next_Time := Next_Time + Interval;
+                  end loop;
+                  Orka.OS.Put_Line ("Polling done");
+               exception
+                  when E : others =>
+                     Orka.OS.Put_Line
+                       ("Error joystick task: " & Ada.Exceptions.Exception_Information (E));
+                     raise;
+               end Poll_Gamepads;
+
                Did_Rotate_Camera : Boolean := False;
 
                Next_Cursor : AWT.Inputs.Cursors.Pointer_Cursor :=
@@ -1167,6 +1138,7 @@ begin
                Render_Task.Start_Rendering;
 
                System.Multiprocessors.Dispatching_Domains.Set_CPU (1);
+
                while not Window.Should_Close loop
                   AWT.Process_Events (0.016667);
 
