@@ -1,8 +1,4 @@
-with "orka_plugin_atmosphere";
-with "orka_plugin_terrain";
-with "awt-linux";
-with "awt";
-with "../orka/orka_config";
+with "config/orka_demo_config";
 
 project Orka_Demo is
 
@@ -10,16 +6,21 @@ project Orka_Demo is
 
    for Source_Dirs use ("src", "src/physics");
 
-   for Object_Dir use "build/obj";
+   for Object_Dir use "build/obj/" & Orka_Demo_Config.Build_Profile;
    for Exec_Dir use "build/bin";
 
    for Main use ("orka_demo.adb");
 
-   package Compiler extends Orka_Config.Compiler is
+   Switches := ("-mavx");
+
+   package Compiler is
+      for Default_Switches ("Ada") use Orka_Demo_Config.Ada_Compiler_Switches & Switches;
       for Local_Configuration_Pragmas use "gnat.adc";
    end Compiler;
 
-   package Binder renames Orka_Config.Binder;
+   package Binder is
+      for Switches ("Ada") use ("-Es"); --  Symbolic traceback
+   end Binder;
 
    package Linker is
       for Switches ("Ada") use ("-Wl,--gc-sections");
