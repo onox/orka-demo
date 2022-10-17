@@ -48,7 +48,7 @@ package body Planets is
      (Planet    : Planet_Characteristics;
       Direction : Matrices.Vector4) return Orka.Float_64 is
    begin
-      return Matrices.Vectors.Length (Flattened_Vector (Planet, Direction, 0.0));
+      return Matrices.Vectors.Norm (Flattened_Vector (Planet, Direction, 0.0));
    end Radius;
 
    function Radius

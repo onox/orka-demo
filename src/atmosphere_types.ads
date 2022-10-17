@@ -1,5 +1,3 @@
-with GL.Types;
-
 with Orka.Behaviors;
 
 with Integrators.RK4;

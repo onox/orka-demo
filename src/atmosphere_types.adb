@@ -53,12 +53,12 @@ package body Atmosphere_Types is
       --  z = altitude above sea level
 
       Distance_To_Center : constant Orka.Float_64 :=
-        Integrators.Vectors.Length (State.Position - Earth_Center);
+        Integrators.Vectors.Norm (State.Position - Earth_Center);
       Radius_To_Center : constant Orka.Float_64 :=
         Planets.Earth.Planet.Radius (Direction_Up);
         --  FIXME Direction_Up is already flattened
    begin
-      Integrators.Quaternions.Rotate_At_Origin
+      Gravity := Integrators.Quaternions.Rotate
         (Gravity, Integrators.Quaternions.Conjugate (State.Orientation));
 
       if Hit_Detection and Distance_To_Center <= Radius_To_Center then
@@ -68,7 +68,7 @@ package body Atmosphere_Types is
             New_Momentum : Vector4 := -State.Momentum;
 --            New_Momentum : Vector4 := -1.0 * State.Velocity * Object.Mass;
          begin
-            Integrators.Quaternions.Rotate_At_Origin
+            New_Momentum := Integrators.Quaternions.Rotate
               (New_Momentum, Integrators.Quaternions.Conjugate (State.Orientation));
 
             --  FIXME Doesn't bounce on the surface of the planet

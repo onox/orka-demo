@@ -165,11 +165,11 @@ package body Integrators.RK4 is
       begin
          for Force_Point of Forces.all loop
             declare
-               Force  : Vectors.Vector4 := Force_Point.Force;
-               Offset : Vectors.Vector4 := Force_Point.Point - Center_Of_Mass;
+               Force  : constant Vectors.Vector4 :=
+                 Quaternions.Rotate (Force_Point.Force, Object.Angular.Orientation);
+               Offset : constant Vectors.Vector4 :=
+                 Quaternions.Rotate (Force_Point.Point - Center_Of_Mass, Object.Angular.Orientation);
             begin
-               Quaternions.Rotate_At_Origin (Force, Object.Angular.Orientation);
-               Quaternions.Rotate_At_Origin (Offset, Object.Angular.Orientation);
                Total_Force  := Total_Force  + Force;
                Total_Torque := Total_Torque - Vectors.Cross (Force, Offset);
             end;
@@ -186,9 +186,9 @@ package body Integrators.RK4 is
       begin
          for Moment of Moments.all loop
             declare
-               Torque : Vectors.Vector4 := Moment;
+               Torque : constant Vectors.Vector4 :=
+                 Quaternions.Rotate (Moment, Object.Angular.Orientation);
             begin
-               Quaternions.Rotate_At_Origin (Torque, Object.Angular.Orientation);
                Total_Torque := Total_Torque + Torque;
             end;
          end loop;
